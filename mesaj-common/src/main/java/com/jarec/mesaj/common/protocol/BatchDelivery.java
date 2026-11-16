@@ -4,6 +4,9 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.util.List;
 
+/**
+ * Delivers a batch of queued message identifiers to a recipient.
+ */
 public record BatchDelivery(List<String> messageIds, String recipientPermanentUuid, String senderPermanentUuid) implements ProtocolMessage {
     public BatchDelivery {
         messageIds = List.copyOf(messageIds);

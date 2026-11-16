@@ -7,6 +7,9 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 
+/**
+ * Reads length-prefixed JSON frames from a stream and converts them into protocol messages.
+ */
 public final class PacketDecoder {
     public static final int MAX_FRAME_SIZE = 10 * 1024 * 1024;
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();

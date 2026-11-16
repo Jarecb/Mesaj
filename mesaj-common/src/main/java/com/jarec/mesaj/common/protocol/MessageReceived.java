@@ -2,6 +2,9 @@ package com.jarec.mesaj.common.protocol;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+/**
+ * Acknowledges server acceptance of a message and reports its conversation sequence.
+ */
 public record MessageReceived(String messageId, String senderPermanentUuid, long sequenceNumber) implements ProtocolMessage {
     public MessageReceived {
         if (messageId == null || messageId.isBlank()) {

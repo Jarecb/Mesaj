@@ -2,6 +2,9 @@ package com.jarec.mesaj.common.protocol;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+/**
+ * Confirms login and supplies the user's permanent and session identifiers.
+ */
 public record LoginSuccess(String username, String permanentUuid, String sessionUuid) implements ProtocolMessage {
     public LoginSuccess {
         if (username == null || username.isBlank()) {

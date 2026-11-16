@@ -8,6 +8,9 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 
+/**
+ * Serializes protocol messages as length-prefixed UTF-8 JSON frames.
+ */
 public final class PacketEncoder {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 

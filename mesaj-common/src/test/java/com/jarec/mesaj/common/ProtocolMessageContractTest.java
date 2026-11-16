@@ -11,6 +11,9 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+/**
+ * Verifies protocol JSON round trips and binary frame encoding and decoding.
+ */
 class ProtocolMessageContractTest {
 
     private final ObjectMapper mapper = new ObjectMapper();

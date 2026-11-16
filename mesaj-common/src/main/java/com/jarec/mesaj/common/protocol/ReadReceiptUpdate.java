@@ -2,6 +2,9 @@ package com.jarec.mesaj.common.protocol;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+/**
+ * Reports whether a message has been read within a conversation.
+ */
 public record ReadReceiptUpdate(String userPermanentUuid, String conversationPartnerUuid, String messageId, boolean read) implements ProtocolMessage {
     public ReadReceiptUpdate {
         if (userPermanentUuid == null || userPermanentUuid.isBlank()) {

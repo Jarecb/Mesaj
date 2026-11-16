@@ -2,6 +2,9 @@ package com.jarec.mesaj.common.protocol;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
+/**
+ * Submits a message addressed to a recipient's permanent identifier.
+ */
 public record SendMessage(String recipientPermanentUuid, String messageId, String text) implements ProtocolMessage {
     public SendMessage {
         if (recipientPermanentUuid == null || recipientPermanentUuid.isBlank()) {
