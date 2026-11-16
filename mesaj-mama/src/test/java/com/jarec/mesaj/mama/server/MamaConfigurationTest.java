@@ -22,16 +22,20 @@ class MamaConfigurationTest {
         assertThat(configuration)
                 .returns(9090, MamaConfiguration::port)
                 .returns("mongodb://localhost/mesaj", MamaConfiguration::mongoUri)
-                .returns(keyStore, MamaConfiguration::tlsKeyStore);
+                .returns(keyStore, MamaConfiguration::tlsKeyStore)
+                .returns("localhost:9092", MamaConfiguration::kafkaBootstrapServers)
+                .returns("mesaj.messages", MamaConfiguration::kafkaMessagesTopic);
         assertThat(configuration.tlsKeyStorePassword()).containsExactly("secret".toCharArray());
         MamaConfiguration equivalent = new MamaConfiguration(9090, "mongodb://localhost/mesaj",
-                keyStore, "secret".toCharArray());
+                keyStore, "secret".toCharArray(), "localhost:9092", "mesaj.messages");
         assertThat(configuration).isEqualTo(equivalent).hasSameHashCodeAs(equivalent);
         assertThat(configuration.toString()).contains("tlsKeyStorePassword=[redacted]")
                 .doesNotContain("secret")
                 .doesNotContain("mongodb://localhost/mesaj");
         assertThat(configuration).isNotEqualTo(new MamaConfiguration(9090, "mongodb://localhost/mesaj",
-                keyStore, "different".toCharArray()));
+                keyStore, "different".toCharArray(), "localhost:9092", "mesaj.messages"))
+                .isNotEqualTo(new MamaConfiguration(9090, "mongodb://localhost/mesaj",
+                keyStore, "secret".toCharArray(), "other:9092", "mesaj.messages"));
     }
 
     @Test
@@ -45,6 +49,7 @@ class MamaConfigurationTest {
                 "MAMA_TLS_KEYSTORE_PASSWORD", "secret",
                 "MAMA_PORT", "not-a-port")));
         assertThatIllegalArgumentException().isThrownBy(() -> new MamaConfiguration(0,
-                "mongodb://localhost/mesaj", Path.of("cert.p12"), "secret".toCharArray()));
+                "mongodb://localhost/mesaj", Path.of("cert.p12"), "secret".toCharArray(),
+                "localhost:9092", "mesaj.messages"));
     }
 }

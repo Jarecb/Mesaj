@@ -5,10 +5,13 @@ import com.jarec.mesaj.common.PacketEncoder;
 import com.jarec.mesaj.common.protocol.GetUsers;
 import com.jarec.mesaj.common.protocol.Login;
 import com.jarec.mesaj.common.protocol.LoginSuccess;
+import com.jarec.mesaj.common.protocol.MessageReceived;
+import com.jarec.mesaj.common.protocol.SendMessage;
 import com.jarec.mesaj.common.protocol.UserList;
 import com.jarec.mesaj.mama.auth.AuthService;
 import com.jarec.mesaj.mama.auth.User;
 import com.jarec.mesaj.mama.auth.UserRepository;
+import com.jarec.mesaj.mama.message.InMemoryMessageRepository;
 import com.jarec.mesaj.mama.session.SessionRegistry;
 import org.junit.jupiter.api.Test;
 
@@ -47,7 +50,7 @@ class ClientConnectionHandlerTest {
         requests.write(PacketEncoder.encode(new GetUsers()));
         TestSocket socket = new TestSocket(new ByteArrayInputStream(requests.toByteArray()));
 
-        new ClientConnectionHandler(new AuthService(repository), registry).handle(socket);
+        new ClientConnectionHandler(new AuthService(repository), registry, new InMemoryMessageRepository()).handle(socket);
 
         ByteArrayInputStream responses = new ByteArrayInputStream(socket.output.toByteArray());
         assertThat(PacketDecoder.decode(responses)).isInstanceOf(LoginSuccess.class);
@@ -62,10 +65,40 @@ class ClientConnectionHandlerTest {
         ByteArrayOutputStream requests = new ByteArrayOutputStream();
         requests.write(PacketEncoder.encode(new GetUsers()));
         TestSocket socket = new TestSocket(new ByteArrayInputStream(requests.toByteArray()));
-        UserRepository repository = new UserRepository() {
+        ClientConnectionHandler handler = new ClientConnectionHandler(
+                new AuthService(fixedUserRepository()), new SessionRegistry(), new InMemoryMessageRepository());
+        assertThatThrownBy(() -> handler.handle(socket))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("login is required");
+        assertThat(socket.closed).isTrue();
+    }
+
+    @Test
+    void acceptsMessagesOnlyAfterLoginAndReturnsThePersistedSequence() throws Exception {
+        String recipient = UUID.randomUUID().toString();
+        ByteArrayOutputStream requests = new ByteArrayOutputStream();
+        requests.write(PacketEncoder.encode(new Login("alex")));
+        requests.write(PacketEncoder.encode(new SendMessage(recipient, "message-1", "hello")));
+        TestSocket socket = new TestSocket(new ByteArrayInputStream(requests.toByteArray()));
+
+        new ClientConnectionHandler(new AuthService(fixedUserRepository()),
+                new SessionRegistry(), new InMemoryMessageRepository()).handle(socket);
+
+        ByteArrayInputStream responses = new ByteArrayInputStream(socket.output.toByteArray());
+        LoginSuccess login = (LoginSuccess) PacketDecoder.decode(responses);
+        assertThat((MessageReceived) PacketDecoder.decode(responses))
+                .isEqualTo(new MessageReceived("message-1", login.permanentUuid(), 1));
+    }
+
+    private static Object decodeLogin(byte[] bytes) throws Exception {
+        return PacketDecoder.decode(new ByteArrayInputStream(bytes));
+    }
+
+    private static UserRepository fixedUserRepository() {
+        return new UserRepository() {
             @Override
             public User findOrCreate(String username) {
-                return new User(username, UUID.randomUUID());
+                return new User(username, UUID.fromString("123e4567-e89b-12d3-a456-426614174000"));
             }
 
             @Override
@@ -73,17 +106,6 @@ class ClientConnectionHandlerTest {
                 return Map.of();
             }
         };
-
-        ClientConnectionHandler handler = new ClientConnectionHandler(
-                new AuthService(repository), new SessionRegistry());
-        assertThatThrownBy(() -> handler.handle(socket))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("login is required");
-        assertThat(socket.closed).isTrue();
-    }
-
-    private static Object decodeLogin(byte[] bytes) throws Exception {
-        return PacketDecoder.decode(new ByteArrayInputStream(bytes));
     }
 
     private static final class TestSocket extends Socket {

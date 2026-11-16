@@ -10,6 +10,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 /**
  * Verifies protocol JSON round trips and binary frame encoding and decoding.
@@ -56,5 +57,10 @@ class ProtocolMessageContractTest {
         oversized[3] = (byte) PacketDecoder.MAX_FRAME_SIZE;
         assertThatThrownBy(() -> PacketDecoder.decode(new ByteArrayInputStream(oversized)))
                 .isInstanceOf(Exception.class);
+    }
+
+    @Test
+    void rejectsMessageAcknowledgmentsWithoutAValidSequence() {
+        assertThatIllegalArgumentException().isThrownBy(() -> new MessageReceived("msg-1", "user-1", 0));
     }
 }

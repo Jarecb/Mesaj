@@ -7,6 +7,7 @@ import com.jarec.mesaj.common.protocol.LoginSuccess;
 import com.jarec.mesaj.common.protocol.ProtocolMessage;
 import com.jarec.mesaj.common.protocol.UserList;
 import com.jarec.mesaj.mama.auth.AuthService;
+import com.jarec.mesaj.mama.message.MessageRepository;
 import com.jarec.mesaj.mama.session.ClientSession;
 import com.jarec.mesaj.mama.session.SessionRegistry;
 
@@ -20,13 +21,16 @@ import java.util.UUID;
 public final class ClientConnectionHandler {
     private final AuthService authService;
     private final SessionRegistry sessionRegistry;
+    private final MessageRepository messageRepository;
 
-    public ClientConnectionHandler(AuthService authService, SessionRegistry sessionRegistry) {
-        if (authService == null || sessionRegistry == null) {
-            throw new IllegalArgumentException("authService and sessionRegistry must not be null");
+    public ClientConnectionHandler(
+            AuthService authService, SessionRegistry sessionRegistry, MessageRepository messageRepository) {
+        if (authService == null || sessionRegistry == null || messageRepository == null) {
+            throw new IllegalArgumentException("authService, sessionRegistry and messageRepository must not be null");
         }
         this.authService = authService;
         this.sessionRegistry = sessionRegistry;
+        this.messageRepository = messageRepository;
     }
 
     public void handle(Socket socket) throws IOException {
@@ -57,7 +61,9 @@ public final class ClientConnectionHandler {
     private PacketDispatcher createDispatcher() {
         return new PacketDispatcher(Map.of(
                 Login.class, (message, context) -> handleLogin((Login) message, context),
-                GetUsers.class, (_, context) -> handleGetUsers(context)));
+                GetUsers.class, (_, context) -> handleGetUsers(context),
+                com.jarec.mesaj.common.protocol.SendMessage.class,
+                new SendMessageHandler(messageRepository)));
     }
 
     private LoginSuccess handleLogin(Login login, ConnectionContext context) {
