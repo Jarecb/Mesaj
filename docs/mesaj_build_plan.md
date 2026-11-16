@@ -4,7 +4,7 @@ This build plan breaks down the development of the **Mesaj** messaging system in
 
 The PRD's acceptance criteria (AC-01–AC-20) are the product-level release gates. Ticket-level criteria below implement them; the traceability table in Section 10 identifies the owning tickets.
 
-**Status snapshot (2026-11-16):** Stages 1–3 are partially implemented; Stages 4–10 have not started. The completed Stage 3 implementation builds and passes the shared and Mama tests, including 50 concurrent TLS logins, but MongoDB has not been integration-tested against a live server. Docker Compose configuration validates, while container startup and persistence remain unverified. Per-ticket status and remaining acceptance gaps are noted below.
+**Status snapshot (2026-11-16):** Stages 1–4 are partially implemented; Stages 5–10 have not started. Stage 4 now includes local profile persistence and per-username file locking with Copil tests. The completed Stage 3 implementation builds and passes the shared and Mama tests, including 50 concurrent TLS logins, but MongoDB has not been integration-tested against a live server. Docker Compose configuration validates, while container startup and persistence remain unverified. Per-ticket status and remaining acceptance gaps are noted below.
 
 ---
 
@@ -28,7 +28,7 @@ This table shows the order of work, which tickets block other tickets, and where
 | **1** | `mesaj-common` | Multi-module setup, DTOs & Binary Wire Codec | **Partial** | None | None (Core Foundation) |
 | **2** | Infrastructure | Docker Compose (MongoDB, Kafka, `Mama` container) | **Partial** | Stage 1 (MSJ-101) | Stage 3, Stage 4 |
 | **3** | `mesaj-mama` | TLS Socket Server, Virtual Threads & User Auth | **Partial** | Stage 1 | Stage 2, Stage 4 |
-| **4** | `mesaj-copil` | Local Profile Persistence & Single-User File Lock | **Not started** | Stage 1 | Stage 2, Stage 3 |
+| **4** | `mesaj-copil` | Local Profile Persistence & Single-User File Lock | **Partial** | Stage 1 | Stage 2, Stage 3 |
 | **5** | `mesaj-mama` | MongoDB Persistence, Ordering & Kafka Producer | **Not started** | Stage 2, Stage 3 | Stage 6 |
 | **6** | `mesaj-copil` | TLS Socket Client & Background Event Dispatcher | **Not started** | Stage 3, Stage 4 | Stage 5 |
 | **7** | `mesaj-mama` | Kafka Consumer Batch Push & Read Receipt Sync | **Not started** | Stage 5 | Stage 8 |
@@ -127,7 +127,7 @@ Implementation notes (2026-11-16): Implemented `SessionRegistry` with per-user/p
 
 ### Stage 4: Client Local Setup & Instance Locking (`mesaj-copil`)
 
-Implementation notes (2026-11-16): **Not started.** No profile persistence or per-username instance-lock implementation or tests exist in `mesaj-copil`.
+Implementation notes (2026-11-16): Implemented `Profile` and `ProfileRepository` for local JSON profiles, with atomic writes, cross-process write coordination, and OS-level file permission restrictions. Added `UserInstanceLock` with hashed per-username lock paths, `FileChannel.tryLock()`, and shutdown cleanup. Copil tests cover profile save/list/update/corruption and lock acquisition/release. Stage 4 is **partially complete**: the JSON is not encrypted, and the planned integration into the Copil application startup/login flow is pending.
 
 #### **MSJ-401: Implement Local User Profile Storage**
 * **Goal:** Save and load local user profiles (`username`, `permanentUuid`, `sessionUuid`) on disk.

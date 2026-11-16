@@ -2,7 +2,7 @@
 
 Mesaj is a Java desktop messaging project in development. Its planned architecture pairs **Mama**, a backend server, with **Copil**, a desktop client. The shared `mesaj-common` module contains the wire protocol and framing code used by both.
 
-> **Development status (2026-11-16):** Stages 1–3 are partially implemented. Mama has a TLS server, login, a registered-user directory, and multi-device session tracking; Docker Compose scaffolding for MongoDB and Kafka is available. The MongoDB repository has not been integration-tested against a live database, the container stack has not been brought up in this environment, and Stages 4–10 remain unimplemented. This is not yet a usable end-to-end messaging application.
+> **Development status (2026-11-16):** Stages 1–4 are partially implemented. Mama has a TLS server, login, a registered-user directory, and multi-device session tracking; Copil has local profile persistence and per-username instance locking. Docker Compose scaffolding for MongoDB and Kafka is available. The MongoDB repository has not been integration-tested against a live database, the container stack has not been brought up in this environment, and Stages 5–10 remain unimplemented. This is not yet a usable end-to-end messaging application.
 
 ## Project modules
 
@@ -10,7 +10,7 @@ Mesaj is a Java desktop messaging project in development. Its planned architectu
 | --- | --- | --- |
 | `mesaj-common` | Shared protocol records and binary frame codec | Implemented; contract and coverage gaps remain |
 | `mesaj-mama` | Backend server, authentication, persistence, and routing | TLS, login, directory, and in-memory session registry implemented; persistence and message routing remain |
-| `mesaj-copil` | Desktop client, local profiles, and messaging UI | Not started |
+| `mesaj-copil` | Desktop client, local profiles, and messaging UI | Profile persistence and per-user instance lock implemented; network and UI remain |
 
 The [product requirements](docs/Mesaj_PRD.md) describe the target system. The [build plan](docs/mesaj_build_plan.md) tracks stage and ticket status.
 
@@ -22,7 +22,7 @@ The [product requirements](docs/Mesaj_PRD.md) describe the target system. The [b
 - JUnit 5 and AssertJ for tests
 - JaCoCo for code coverage
 - Stage 2 infrastructure: Docker Compose for MongoDB and Kafka (configuration only; runtime startup not verified)
-- Remaining: MongoDB message persistence and Kafka routing, Copil desktop client, and JavaFX UI
+- Remaining: MongoDB message persistence and Kafka routing, Copil networking, local message storage, and JavaFX UI
 
 ## Build and test
 
@@ -32,6 +32,12 @@ JaCoCo 0.8.16 is configured and supports Java 25 class files. Run all unit tests
 
 ```shell
 mvn clean test
+```
+
+The Copil module and its shared dependency tests were verified with:
+
+```shell
+mvn --batch-mode --no-transfer-progress -pl mesaj-copil -am test
 ```
 
 The Stage 3 module and its shared dependency were verified with:
