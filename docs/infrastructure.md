@@ -9,17 +9,22 @@ Stage 2 provides Docker Compose configuration for a local MongoDB instance, a si
 
 ## Start MongoDB and Kafka
 
-Copy `.env.example` to `.env` and replace the MongoDB username and password placeholders with unique local-only values. The example file intentionally contains no usable credentials. Then start the default infrastructure:
+Copy `.env.example` to `.env` and replace the MongoDB username, MongoDB password, and TLS keystore password placeholders with unique local-only values. Create a PKCS12 server keystore at the configured path before starting Mama:
 
-```shell
+```powershell
 Copy-Item .env.example .env
+New-Item -ItemType Directory -Force .secrets
+keytool -genkeypair -alias mama -keyalg RSA -keysize 3072 -storetype PKCS12 `
+  -keystore .secrets/mama-keystore.p12 -storepass YOUR_LOCAL_KEYSTORE_PASSWORD `
+  -keypass YOUR_LOCAL_KEYSTORE_PASSWORD -dname "CN=localhost" `
+  -ext "SAN=dns:localhost,ip:127.0.0.1" -validity 365 -noprompt
 docker compose up -d
 docker compose ps
 ```
 
 MongoDB and Kafka publish ports only on `127.0.0.1`. MongoDB uses the local-development root credentials from `.env`; Kafka is configured without authentication or TLS and is for local development only. Do not expose these ports on an untrusted network.
 
-The root `.gitignore` excludes `.env` and other `.env.*` files while allowing `.env.example`. Verify locally with `git check-ignore -v .env`. Never commit actual credentials or use local development credentials in production.
+The root `.gitignore` excludes `.env`, other `.env.*` files, and `/.secrets/` while allowing `.env.example`. The Docker build context also excludes local keystores. Verify locally with `git check-ignore -v .env .secrets/mama-keystore.p12`. Never commit actual credentials or use local development credentials in production.
 
 Compose waits for MongoDB and Kafka health checks. The `kafka-init` one-shot service creates the configured message topic before Mama starts. Inside the Compose network, applications use `mongodb:27017` and `kafka:29092`; host tools use the ports configured in `.env`.
 
@@ -27,16 +32,18 @@ MongoDB and Kafka data persist in the `mongodb-data` and `kafka-data` named volu
 
 ## Mama container
 
-The Mama service is in the `mama` Compose profile and builds from `mesaj-mama/Dockerfile`. The Dockerfile packages the Maven modules and runs `com.jarec.mesaj.mama.MamaApplication`.
+The Mama service is in the `mama` Compose profile and builds from `mesaj-mama/Dockerfile`. The Dockerfile packages the Maven modules and runtime dependencies, then runs `com.jarec.mesaj.mama.MamaApplication`. It opens a TLS listener and requires a PKCS12 keystore; `.env` points to a local keystore, mounted read-only into the container.
 
-**Stage 3 has not implemented `MamaApplication` yet**, so do not start the `mama` profile until that server entry point exists. When implemented, start the full stack with:
+Start the full stack with:
 
 ```shell
 docker compose --profile mama up --build -d
 docker compose --profile mama ps
 ```
 
-The service is configured to wait for healthy MongoDB and Kafka topic initialization. Its TCP health check will report healthy only after Mama listens on `MAMA_PORT`. Database credentials are passed through `MONGODB_URI`; URI-reserved characters in credentials must be percent-encoded.
+The service is configured to wait for healthy MongoDB and Kafka topic initialization. Its TCP health check reports healthy after Mama listens on `MAMA_PORT`; it does not perform a TLS handshake. MongoDB credentials are passed through `MONGODB_URI`; URI-reserved characters in credentials must be percent-encoded. For a self-signed local certificate, configure client trust before connecting; this local setup is not intended for production.
+
+On each TLS connection, send `LOGIN` first. The server responds with `LOGIN_SUCCESS` containing the stable permanent user UUID and a new session UUID. Once authenticated, `GET_USERS` returns all registered users, whether they are online or offline.
 
 ## Configuration
 
@@ -53,9 +60,11 @@ The service is configured to wait for healthy MongoDB and Kafka topic initializa
 | `KAFKA_MESSAGES_TOPIC` | `mesaj.messages` | Topic created for message routing |
 | `KAFKA_TOPIC_PARTITIONS` | `3` | Number of partitions in the message topic |
 | `MAMA_PORT` | `9090` | Mama TCP port |
+| `MAMA_TLS_KEYSTORE_FILE` | `./.secrets/mama-keystore.p12` | Host path to the Mama PKCS12 TLS keystore |
+| `MAMA_TLS_KEYSTORE_PASSWORD` | Replace placeholder | Local keystore password |
 
 This single-broker configuration uses replication factor 1 and plaintext Kafka listeners; it is not suitable for production.
 
 ## Current validation limits
 
-`docker compose config -q` passed in the implementation environment, confirming the Compose file and local environment-variable interpolation are valid. A subsequent `docker compose up -d` was blocked while pulling the public MongoDB and Kafka images: Docker Hub returned `authentication required - incorrect username or password`. No services started, so health checks, topic initialization, volume persistence, and restart behavior have not been verified. Check Docker Desktop's registry sign-in or stored Docker Hub credentials, then rerun the startup commands above. The Mama image also cannot run until Stage 3 adds the configured Java entry point and server implementation.
+Stage 3's automated TLS integration test verifies 50 concurrent TLS login clients. Container health checks, topic initialization, and volume persistence still require running the Compose stack with a local keystore and available container images.
