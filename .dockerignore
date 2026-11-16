@@ -1,0 +1,8 @@
+.git
+.idea
+.mvn
+**/target
+**/*.iml
+.env
+.env.*
+!.env.example

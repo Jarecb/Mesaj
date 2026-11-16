@@ -40,7 +40,7 @@ This table shows the order of work, which tickets block other tickets, and where
 
 ### Stage 1: Shared Foundation (`mesaj-common`)
 
-Implementation notes (2026-11-16): Stage 1 was started and completed in the local workspace. The root Maven project now uses a multi-module layout (`mesaj-common`, `mesaj-mama`, `mesaj-copil`), Java 25, and JaCoCo coverage enforcement. The shared protocol layer was implemented with immutable packet records and a length-prefixed codec. Validation: `mvn test -q` passed successfully for the project state after MSJ-101 through MSJ-103.
+Implementation notes (2026-11-16): The root Maven project now has `mesaj-common`, `mesaj-mama`, and `mesaj-copil` modules targeting Java 25. `mesaj-common` contains the nine immutable protocol records and length-prefixed JSON encoder/decoder; contract tests exercise round trips and basic valid/invalid frame handling. Class-level Javadocs were added. `mvn clean test` passes with JaCoCo 0.8.16. Stage 1 is **partially complete**: the tests do not yet cover all required malformed JSON, missing fields, fragmented reads, EOF, and constructor-validation cases; `mvn clean verify` currently fails the 100% JaCoCo line/branch threshold, and the planned cognitive-complexity gate is not configured.
 
 #### **MSJ-101: Initialize Multi-Module Java 25 Project & Quality Gates**
 * **Goal:** Set up the parent build with `mesaj-common`, `mesaj-mama`, and `mesaj-copil`, plus automated checks for 100% coverage and Cognitive Complexity < 10.
@@ -73,6 +73,8 @@ Implementation notes (2026-11-16): Stage 1 was started and completed in the loca
 
 ### Stage 2: Infrastructure & Container Orchestration
 
+Implementation notes (2026-11-16): Added `docker-compose.yml` for persistent MongoDB and single-node Kafka in KRaft mode, dependency health checks, and configurable message-topic creation. Added the Mama multi-stage Dockerfile, `.env.example` with placeholders, `.dockerignore`, Git ignore rules for local environment files, and setup/security notes in `README.md` and `docs/infrastructure.md`. The Mama service is gated behind the `mama` profile because Stage 3 has not yet implemented `MamaApplication`. `mvn clean -pl mesaj-mama -am package` and YAML parsing passed. On 2026-11-16, `docker compose config -q` also passed, but `docker compose up -d` could not pull the public MongoDB/Kafka images because Docker Hub authentication returned “authentication required - incorrect username or password.” No containers started, so health checks and persistence remain unverified. Stage 2 is **partially complete**.
+
 #### **MSJ-201: Docker Compose Setup for MongoDB, Kafka & Mama**
 * **Goal:** Configure local containers with persistent storage volumes so offline messages and user records survive restarts.
 * **Blocker:** MSJ-101.
@@ -85,6 +87,8 @@ Implementation notes (2026-11-16): Stage 1 was started and completed in the loca
 ---
 
 ### Stage 3: Backend Core & Authentication (`mesaj-mama`)
+
+Implementation notes (2026-11-16): **Not started.** No server/session registry, user repository, authentication service, TLS listener, or packet dispatcher has been implemented. `MamaApplication` is still absent; this blocks running the Mama Compose profile.
 
 #### **MSJ-301: Build Thread-Safe Multi-Device Session Registry**
 * **Goal:** Track active client connections using `ConcurrentHashMap<PermanentUuid, ConcurrentHashMap<SessionUuid, ClientSession>>`.
@@ -117,6 +121,8 @@ Implementation notes (2026-11-16): Stage 1 was started and completed in the loca
 
 ### Stage 4: Client Local Setup & Instance Locking (`mesaj-copil`)
 
+Implementation notes (2026-11-16): **Not started.** No profile persistence or per-username instance-lock implementation or tests exist in `mesaj-copil`.
+
 #### **MSJ-401: Implement Local User Profile Storage**
 * **Goal:** Save and load local user profiles (`username`, `permanentUuid`, `sessionUuid`) on disk.
 * **Blocker:** MSJ-102.
@@ -138,6 +144,8 @@ Implementation notes (2026-11-16): Stage 1 was started and completed in the loca
 ---
 
 ### Stage 5: Backend Message Persistence & Kafka Routing (`mesaj-mama`)
+
+Implementation notes (2026-11-16): **Not started.** MongoDB message persistence, conversation sequencing, transactional outbox, Kafka publishing, and sender acknowledgments are not implemented. This stage depends on Stage 2 infrastructure and Stage 3 server foundations.
 
 #### **MSJ-501: Implement MongoDB Message Store & Monotonic Sequence Generator**
 * **Goal:** Persist incoming messages durably in MongoDB with a strictly increasing sequence number per 1-to-1 conversation.
@@ -161,6 +169,8 @@ Implementation notes (2026-11-16): Stage 1 was started and completed in the loca
 
 ### Stage 6: Client Network Worker (`mesaj-copil`)
 
+Implementation notes (2026-11-16): **Not started.** No TLS client, background packet loop, outbound queue, or packet event bus has been implemented. This stage depends on Stage 3 and Stage 4.
+
 #### **MSJ-601: Build Non-Blocking TLS Client & Background Packet Loop**
 * **Goal:** Connect `Copil` to `Mama` over TLS and read/write packets on Virtual Threads without touching the JavaFX UI thread.
 * **Blocker:** MSJ-103, MSJ-303, MSJ-401.
@@ -173,6 +183,8 @@ Implementation notes (2026-11-16): Stage 1 was started and completed in the loca
 ---
 
 ### Stage 7: Offline Batch Push & Read Receipt Sync (`mesaj-mama`)
+
+Implementation notes (2026-11-16): **Not started.** Offline batch delivery, multi-session acknowledgment tracking, and read-receipt persistence/broadcast are not implemented. This stage depends on Stage 5.
 
 #### **MSJ-701: Implement Offline Kafka Batch Delivery & Multi-Device ACK Tracking**
 * **Goal:** Push pending offline messages via `BATCH_DELIVERY` on login, and commit Kafka offsets + notify the sender (`DELIVERED`) only after all active recipient devices return `ACK_BATCH`.
@@ -196,6 +208,8 @@ Implementation notes (2026-11-16): Stage 1 was started and completed in the loca
 
 ### Stage 8: Client Storage Idempotency & Ordering (`mesaj-copil`)
 
+Implementation notes (2026-11-16): **Not started.** No local message database, duplicate-message handling, sequence sorting, or associated tests have been implemented. This stage depends on Stage 4 and Stage 6.
+
 #### **MSJ-801: Build Idempotent Local Message Store & Sequence Sorter**
 * **Goal:** Store received and sent messages in an embedded local database (SQLite or H2), ignoring duplicate `messageId`s and sorting strictly by server sequence number.
 * **Blocker:** MSJ-401, MSJ-601.
@@ -208,6 +222,8 @@ Implementation notes (2026-11-16): Stage 1 was started and completed in the loca
 ---
 
 ### Stage 9: JavaFX Desktop UI (`mesaj-copil`)
+
+Implementation notes (2026-11-16): **Not started.** No JavaFX views, view models, login/profile picker, chat interface, or delivery/read indicators have been implemented. This stage depends on Stage 6 and Stage 8.
 
 #### **MSJ-901: Build Login & Profile Picker ViewModel and View**
 * **Goal:** Let users select an existing local profile or register a new username, enforcing the single-instance lock before connecting.
@@ -230,6 +246,8 @@ Implementation notes (2026-11-16): Stage 1 was started and completed in the loca
 ---
 
 ### Stage 10: End-to-End Integration & Stress Validation
+
+Implementation notes (2026-11-16): **Not started.** No end-to-end multi-client, offline-delivery, restart-durability, or concurrency/load validation exists. This release gate depends on Stages 1–9.
 
 #### **MSJ-1001: Automated Multi-Client Offline & Concurrency Verification**
 * **Goal:** Prove the full system (`Mama` + MongoDB + Kafka + multiple `Copil` instances) satisfies all functional and non-functional requirements.
