@@ -4,7 +4,7 @@ This build plan breaks down the development of the **Mesaj** messaging system in
 
 The PRD's acceptance criteria (AC-01–AC-20) are the product-level release gates. Ticket-level criteria below implement them; the traceability table in Section 10 identifies the owning tickets.
 
-**Status snapshot (2026-11-16):** Stages 1–4 are partially implemented; Stages 5–10 have not started. Stage 4 now includes local profile persistence and per-username file locking with Copil tests. The completed Stage 3 implementation builds and passes the shared and Mama tests, including 50 concurrent TLS logins, but MongoDB has not been integration-tested against a live server. Docker Compose configuration validates, while container startup and persistence remain unverified. Per-ticket status and remaining acceptance gaps are noted below.
+**Status snapshot (2026-11-16):** Stages 1–5 are partially implemented; Stages 6–10 have not started. Stage 5 now includes durable MongoDB message acceptance, atomic sequence increments, a pending outbox state stored with each message, Kafka publishing/retry, and sender acknowledgments. The code and unit tests build locally, but MongoDB/Kafka integration and container startup have not been verified against live services. Stage 4 includes local profile persistence and per-username file locking. Remaining acceptance gaps are noted below.
 
 ---
 
@@ -151,7 +151,7 @@ Implementation notes (2026-11-16): Implemented `Profile` and `ProfileRepository`
 
 ### Stage 5: Backend Message Persistence & Kafka Routing (`mesaj-mama`)
 
-Implementation notes (2026-11-16): **Not started.** MongoDB message persistence, conversation sequencing, transactional outbox, Kafka publishing, and sender acknowledgments are not implemented. This stage depends on Stage 2 infrastructure and Stage 3 server foundations.
+Implementation notes (2026-11-16): **Implemented; live-service integration remains unverified.** Messages and their pending outbox status are persisted together in one MongoDB document; per-conversation sequence numbers use MongoDB atomic increments. The background publisher routes records to Kafka by recipient UUID and only marks them published after broker acknowledgment. MongoDB/Kafka behavior has not been integration-tested against live services.
 
 #### **MSJ-501: Implement MongoDB Message Store & Monotonic Sequence Generator**
 * **Goal:** Persist incoming messages durably in MongoDB with a strictly increasing sequence number per 1-to-1 conversation.
@@ -160,7 +160,7 @@ Implementation notes (2026-11-16): **Not started.** MongoDB message persistence,
   * **Red:** Write concurrent tests where 20 threads send messages in the same conversation (`userA` $\leftrightarrow$ `userB`) and verify sequence numbers are strictly `1, 2, 3... 20` with zero duplicates.
   * **Green:** Implement `SequenceGenerator` (using MongoDB atomic `findOneAndUpdate` `$inc` on a deterministic conversation key `min(uuidA, uuidB) + "_" + max(uuidA, uuidB)`), `MessageRepository`, and a durable outbox record written atomically with each accepted message.
   * **Refactor:** Extract conversation key generation into a dedicated `ConversationId` value object.
-* **Acceptance Criteria:** Sequence numbers never collide or go out of order under concurrent load; the server assigns sequence numbers and rejects invalid or duplicate message submissions; message and outbox persistence are atomic.
+* **Acceptance Criteria:** Sequence numbers never collide under concurrent increments; the server assigns sequence numbers and rejects invalid or conflicting duplicate message submissions; message and pending outbox state are persisted atomically in one MongoDB document.
 
 #### **MSJ-502: Publish Messages to Kafka Partitioned by Recipient UUID**
 * **Goal:** Route durably saved messages asynchronously to Kafka using `recipientPermanentUuid` as the partition key, and return `MESSAGE_RECEIVED` only after MongoDB persistence succeeds.

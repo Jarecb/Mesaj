@@ -2,6 +2,9 @@ package com.jarec.mesaj.mama;
 
 import com.jarec.mesaj.mama.auth.AuthService;
 import com.jarec.mesaj.mama.auth.MongoUserRepository;
+import com.jarec.mesaj.mama.message.KafkaMessagePublisher;
+import com.jarec.mesaj.mama.message.MongoMessageRepository;
+import com.jarec.mesaj.mama.message.OutboxWorker;
 import com.jarec.mesaj.mama.server.ClientConnectionHandler;
 import com.jarec.mesaj.mama.server.MamaConfiguration;
 import com.jarec.mesaj.mama.server.TlsContextFactory;
@@ -21,15 +24,20 @@ public final class MamaApplication {
         MamaConfiguration configuration = MamaConfiguration.fromEnvironment(System.getenv());
         SSLContext sslContext = TlsContextFactory.fromPkcs12(
                 configuration.tlsKeyStore(), configuration.tlsKeyStorePassword());
-        try (MongoClient mongoClient = MongoClients.create(configuration.mongoUri())) {
+        try (MongoClient mongoClient = MongoClients.create(configuration.mongoUri());
+             KafkaMessagePublisher publisher = new KafkaMessagePublisher(
+                     configuration.kafkaBootstrapServers(), configuration.kafkaMessagesTopic())) {
             MongoDatabase database = mongoClient.getDatabase("mesaj");
             AuthService authService = new AuthService(new MongoUserRepository(database));
             SessionRegistry sessionRegistry = new SessionRegistry();
-            ClientConnectionHandler connectionHandler =
-                    new ClientConnectionHandler(authService, sessionRegistry);
-            try (TlsSocketServer server = new TlsSocketServer(
-                    sslContext.getServerSocketFactory(), configuration.port(), connectionHandler)) {
+            MongoMessageRepository messageRepository = new MongoMessageRepository(database);
+            ClientConnectionHandler connectionHandler = new ClientConnectionHandler(
+                    authService, sessionRegistry, messageRepository);
+            try (OutboxWorker outboxWorker = new OutboxWorker(messageRepository, publisher);
+                 TlsSocketServer server = new TlsSocketServer(
+                         sslContext.getServerSocketFactory(), configuration.port(), connectionHandler)) {
                 Runtime.getRuntime().addShutdownHook(new Thread(() -> closeServer(server), "mama-shutdown"));
+                outboxWorker.start();
                 server.start();
             }
         }

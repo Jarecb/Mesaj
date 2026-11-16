@@ -7,6 +7,7 @@ import com.jarec.mesaj.common.protocol.LoginSuccess;
 import com.jarec.mesaj.mama.auth.AuthService;
 import com.jarec.mesaj.mama.auth.User;
 import com.jarec.mesaj.mama.auth.UserRepository;
+import com.jarec.mesaj.mama.message.InMemoryMessageRepository;
 import com.jarec.mesaj.mama.session.SessionRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -55,7 +56,7 @@ class TlsSocketServerTest {
         };
         SessionRegistry registry = new SessionRegistry();
         TlsSocketServer server = new TlsSocketServer(serverContext.getServerSocketFactory(), 0,
-                new ClientConnectionHandler(new AuthService(repository), registry));
+                new ClientConnectionHandler(new AuthService(repository), registry, new InMemoryMessageRepository()));
         AtomicReference<IOException> serverFailure = new AtomicReference<>();
         Thread serverThread = Thread.ofVirtual().start(() -> {
             try {

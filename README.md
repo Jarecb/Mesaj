@@ -2,14 +2,14 @@
 
 Mesaj is a Java desktop messaging project in development. Its planned architecture pairs **Mama**, a backend server, with **Copil**, a desktop client. The shared `mesaj-common` module contains the wire protocol and framing code used by both.
 
-> **Development status (2026-11-16):** Stages 1–4 are partially implemented. Mama has a TLS server, login, a registered-user directory, and multi-device session tracking; Copil has local profile persistence and per-username instance locking. Docker Compose scaffolding for MongoDB and Kafka is available. The MongoDB repository has not been integration-tested against a live database, the container stack has not been brought up in this environment, and Stages 5–10 remain unimplemented. This is not yet a usable end-to-end messaging application.
+> **Development status (2026-11-16):** Stages 1–5 are partially implemented. Mama has TLS login, a user directory, multi-device session tracking, durable message acceptance, per-conversation sequencing, and Kafka outbox publishing; Copil has local profile persistence and per-username instance locking. Stage 5 is unit-tested but MongoDB/Kafka behavior and the Compose stack have not been verified against live services. Stages 6–10 remain unimplemented, so this is not yet a usable end-to-end messaging application.
 
 ## Project modules
 
 | Module | Purpose | Status |
 | --- | --- | --- |
 | `mesaj-common` | Shared protocol records and binary frame codec | Implemented; contract and coverage gaps remain |
-| `mesaj-mama` | Backend server, authentication, persistence, and routing | TLS, login, directory, and in-memory session registry implemented; persistence and message routing remain |
+| `mesaj-mama` | Backend server, authentication, persistence, and routing | TLS, login, directory, in-memory session registry, MongoDB message acceptance/outbox, and Kafka publisher implemented; live-service integration remains unverified |
 | `mesaj-copil` | Desktop client, local profiles, and messaging UI | Profile persistence and per-user instance lock implemented; network and UI remain |
 
 The [product requirements](docs/Mesaj_PRD.md) describe the target system. The [build plan](docs/mesaj_build_plan.md) tracks stage and ticket status.
@@ -22,7 +22,7 @@ The [product requirements](docs/Mesaj_PRD.md) describe the target system. The [b
 - JUnit 5 and AssertJ for tests
 - JaCoCo for code coverage
 - Stage 2 infrastructure: Docker Compose for MongoDB and Kafka (configuration only; runtime startup not verified)
-- Remaining: MongoDB message persistence and Kafka routing, Copil networking, local message storage, and JavaFX UI
+- Remaining: Kafka batch delivery and acknowledgments, read receipts, Copil networking, local message storage, and JavaFX UI
 
 ## Build and test
 
@@ -81,4 +81,4 @@ Supported packet types:
 - `BATCH_DELIVERY` and `ACK_BATCH`
 - `READ_RECEIPT_UPDATE`
 
-The shared packet records and frame codec, with their contract tests, are in `mesaj-common`. Mama currently handles `LOGIN` and `GET_USERS`: login reuses a user's permanent UUID and issues a fresh session UUID; authenticated clients can request all registered users, whether online or offline. Active TLS connections are tracked per permanent user UUID. Message sending, persistence, delivery, acknowledgments, read receipts, and the Copil client are not implemented.
+The shared packet records and frame codec, with their contract tests, are in `mesaj-common`. Mama handles `LOGIN`, `GET_USERS`, and `SEND_MSG`: login reuses a user's permanent UUID and issues a fresh session UUID; authenticated clients can request all registered users and submit messages. A sender receives `MESSAGE_RECEIVED` only after MongoDB stores the message and its pending outbox state. The background outbox worker publishes to Kafka using the recipient UUID as key, and retries records not marked published. Active TLS connections are tracked per permanent user UUID. Recipient delivery, acknowledgments, read receipts, and the Copil client are not implemented.

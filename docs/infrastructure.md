@@ -43,7 +43,7 @@ docker compose --profile mama ps
 
 The service is configured to wait for healthy MongoDB and Kafka topic initialization. Its TCP health check reports healthy after Mama listens on `MAMA_PORT`; it does not perform a TLS handshake. MongoDB credentials are passed through `MONGODB_URI`; URI-reserved characters in credentials must be percent-encoded. For a self-signed local certificate, configure client trust before connecting; this local setup is not intended for production.
 
-On each TLS connection, send `LOGIN` first. The server responds with `LOGIN_SUCCESS` containing the stable permanent user UUID and a new session UUID. Once authenticated, `GET_USERS` returns all registered users, whether they are online or offline.
+On each TLS connection, send `LOGIN` first. The server responds with `LOGIN_SUCCESS` containing the stable permanent user UUID and a new session UUID. Once authenticated, `GET_USERS` returns all registered users, whether they are online or offline. An authenticated `SEND_MSG` is durably stored in MongoDB before Mama returns `MESSAGE_RECEIVED`; a background worker publishes the outbox record to Kafka, keyed by recipient permanent UUID.
 
 ## Configuration
 
