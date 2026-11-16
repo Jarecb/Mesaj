@@ -4,6 +4,8 @@ This build plan breaks down the development of the **Mesaj** messaging system in
 
 The PRD's acceptance criteria (AC-01–AC-20) are the product-level release gates. Ticket-level criteria below implement them; the traceability table in Section 10 identifies the owning tickets.
 
+**Status snapshot (2026-11-16):** Stages 1–3 are partially implemented; Stages 4–10 have not started. The completed Stage 3 implementation builds and passes the shared and Mama tests, including 50 concurrent TLS logins, but MongoDB has not been integration-tested against a live server. Docker Compose configuration validates, while container startup and persistence remain unverified. Per-ticket status and remaining acceptance gaps are noted below.
+
 ---
 
 ## 1. Engineering Rules & Quality Standards
@@ -21,18 +23,18 @@ Every ticket in this plan must follow these strict rules:
 
 This table shows the order of work, which tickets block other tickets, and where multiple developers (or workstreams) can build at the same time.
 
-| Stage | Module | Summary | Blockers (Must Finish First) | Can Run in Parallel With |
-| :--- | :--- | :--- | :--- | :--- |
-| **1** | `mesaj-common` | Multi-module setup, DTOs & Binary Wire Codec | None | None (Core Foundation) |
-| **2** | Infrastructure | Docker Compose (MongoDB, Kafka, `Mama` container) | Stage 1 (MSJ-101) | Stage 3, Stage 4 |
-| **3** | `mesaj-mama` | TLS Socket Server, Virtual Threads & User Auth | Stage 1 | Stage 2, Stage 4 |
-| **4** | `mesaj-copil` | Local Profile Persistence & Single-User File Lock | Stage 1 | Stage 2, Stage 3 |
-| **5** | `mesaj-mama` | MongoDB Persistence, Ordering & Kafka Producer | Stage 2, Stage 3 | Stage 6 |
-| **6** | `mesaj-copil` | TLS Socket Client & Background Event Dispatcher | Stage 3, Stage 4 | Stage 5 |
-| **7** | `mesaj-mama` | Kafka Consumer Batch Push & Read Receipt Sync | Stage 5 | Stage 8 |
-| **8** | `mesaj-copil` | Local SQLite/H2 Idempotency & Sequence Sorting | Stage 4, Stage 6 | Stage 7 |
-| **9** | `mesaj-copil` | JavaFX MVVM UI & Delivery Status Indicators | Stage 6, Stage 8 | Stage 7 |
-| **10** | Full System | End-to-End Multi-Device & Offline Stress Testing | All Stages (1–9) | None (Final Release Gate) |
+| Stage | Module | Summary | Status | Blockers (Must Finish First) | Can Run in Parallel With |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **1** | `mesaj-common` | Multi-module setup, DTOs & Binary Wire Codec | **Partial** | None | None (Core Foundation) |
+| **2** | Infrastructure | Docker Compose (MongoDB, Kafka, `Mama` container) | **Partial** | Stage 1 (MSJ-101) | Stage 3, Stage 4 |
+| **3** | `mesaj-mama` | TLS Socket Server, Virtual Threads & User Auth | **Partial** | Stage 1 | Stage 2, Stage 4 |
+| **4** | `mesaj-copil` | Local Profile Persistence & Single-User File Lock | **Not started** | Stage 1 | Stage 2, Stage 3 |
+| **5** | `mesaj-mama` | MongoDB Persistence, Ordering & Kafka Producer | **Not started** | Stage 2, Stage 3 | Stage 6 |
+| **6** | `mesaj-copil` | TLS Socket Client & Background Event Dispatcher | **Not started** | Stage 3, Stage 4 | Stage 5 |
+| **7** | `mesaj-mama` | Kafka Consumer Batch Push & Read Receipt Sync | **Not started** | Stage 5 | Stage 8 |
+| **8** | `mesaj-copil` | Local SQLite/H2 Idempotency & Sequence Sorting | **Not started** | Stage 4, Stage 6 | Stage 7 |
+| **9** | `mesaj-copil` | JavaFX MVVM UI & Delivery Status Indicators | **Not started** | Stage 6, Stage 8 | Stage 7 |
+| **10** | Full System | End-to-End Multi-Device & Offline Stress Testing | **Not started** | All Stages (1–9) | None (Final Release Gate) |
 
 ---
 
@@ -41,6 +43,8 @@ This table shows the order of work, which tickets block other tickets, and where
 ### Stage 1: Shared Foundation (`mesaj-common`)
 
 Implementation notes (2026-11-16): The root Maven project now has `mesaj-common`, `mesaj-mama`, and `mesaj-copil` modules targeting Java 25. `mesaj-common` contains the nine immutable protocol records and length-prefixed JSON encoder/decoder; contract tests exercise round trips and basic valid/invalid frame handling. Class-level Javadocs were added. `mvn clean test` passes with JaCoCo 0.8.16. Stage 1 is **partially complete**: the tests do not yet cover all required malformed JSON, missing fields, fragmented reads, EOF, and constructor-validation cases; `mvn clean verify` currently fails the 100% JaCoCo line/branch threshold, and the planned cognitive-complexity gate is not configured.
+
+**Ticket status:** MSJ-101 is partial (Java 25 multi-module Maven build and JaCoCo threshold are configured; cognitive-complexity enforcement is not). MSJ-102 and MSJ-103 are implemented, but their specified malformed-input, constructor-validation, fragmented-read, EOF, and 100% coverage tests remain incomplete.
 
 #### **MSJ-101: Initialize Multi-Module Java 25 Project & Quality Gates**
 * **Goal:** Set up the parent build with `mesaj-common`, `mesaj-mama`, and `mesaj-copil`, plus automated checks for 100% coverage and Cognitive Complexity < 10.
@@ -73,7 +77,7 @@ Implementation notes (2026-11-16): The root Maven project now has `mesaj-common`
 
 ### Stage 2: Infrastructure & Container Orchestration
 
-Implementation notes (2026-11-16): Added `docker-compose.yml` for persistent MongoDB and single-node Kafka in KRaft mode, dependency health checks, and configurable message-topic creation. Added the Mama multi-stage Dockerfile, `.env.example` with placeholders, `.dockerignore`, Git ignore rules for local environment files, and setup/security notes in `README.md` and `docs/infrastructure.md`. The Mama service is gated behind the `mama` profile because Stage 3 has not yet implemented `MamaApplication`. `mvn clean -pl mesaj-mama -am package` and YAML parsing passed. On 2026-11-16, `docker compose config -q` also passed, but `docker compose up -d` could not pull the public MongoDB/Kafka images because Docker Hub authentication returned “authentication required - incorrect username or password.” No containers started, so health checks and persistence remain unverified. Stage 2 is **partially complete**.
+Implementation notes (2026-11-16): Added `docker-compose.yml` for MongoDB and single-node Kafka in KRaft mode, health checks, persistent volumes, and configurable message-topic creation. Added the Mama multi-stage Dockerfile and runtime dependency packaging, `.env.example`, `.dockerignore`, ignore rules for local environment files and TLS keys, and setup/security notes in `README.md` and `docs/infrastructure.md`. The optional Mama profile mounts a user-provided PKCS12 keystore read-only and waits for MongoDB health and Kafka topic initialization. `docker compose --env-file .env.example config -q` passes. The earlier attempt to start containers failed while pulling public images because Docker Hub returned “authentication required - incorrect username or password”; consequently service health, persistence, topic initialization, and restarts have not been verified. MSJ-201 and Stage 2 are **partially complete**.
 
 #### **MSJ-201: Docker Compose Setup for MongoDB, Kafka & Mama**
 * **Goal:** Configure local containers with persistent storage volumes so offline messages and user records survive restarts.
@@ -88,7 +92,9 @@ Implementation notes (2026-11-16): Added `docker-compose.yml` for persistent Mon
 
 ### Stage 3: Backend Core & Authentication (`mesaj-mama`)
 
-Implementation notes (2026-11-16): **Not started.** No server/session registry, user repository, authentication service, TLS listener, or packet dispatcher has been implemented. `MamaApplication` is still absent; this blocks running the Mama Compose profile.
+Implementation notes (2026-11-16): Implemented `SessionRegistry` with per-user/per-session concurrent maps and atomic registration/removal; MongoDB user mapping and a unique username index with atomic find-or-create upsert; `AuthService` issuing a stable permanent UUID and a new session UUID per login; authenticated `GET_USERS`; a class-keyed packet dispatcher; PKCS12 TLS configuration; and a TLS socket server using Java 25 virtual threads. `MamaApplication` wires MongoDB and TLS configuration, and Compose mounts a configured keystore read-only. Tests cover auth behavior through an in-memory repository, registry stress and concurrent remove/register races, connection cleanup, configuration validation, and 50 concurrent TLS logins plus plaintext rejection. The Mama module builds with its runtime dependencies and `docker compose --env-file .env.example config -q` passes. Stage 3 is **partially complete**: the MongoDB repository has not been verified against a live MongoDB instance, TLS/load behavior beyond the 50-client test is unverified, and 100% coverage and the planned complexity gate have not been met.
+
+**Ticket status:** MSJ-301 implementation and concurrent registry tests are in place; full coverage/quality gates remain outstanding. MSJ-302 login and directory behavior are implemented, but live MongoDB integration and 100% coverage are outstanding. MSJ-303 TLS framing, virtual-thread connections, cleanup, and a 50-client integration test are in place; the planned thousands-of-clients load test and full release criteria remain outstanding.
 
 #### **MSJ-301: Build Thread-Safe Multi-Device Session Registry**
 * **Goal:** Track active client connections using `ConcurrentHashMap<PermanentUuid, ConcurrentHashMap<SessionUuid, ClientSession>>`.

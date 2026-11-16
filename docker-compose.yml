@@ -80,6 +80,8 @@ services:
     environment:
       MAMA_PORT: ${MAMA_PORT:-9090}
       MONGODB_URI: "mongodb://${MONGO_ROOT_USERNAME:?Set MONGO_ROOT_USERNAME in .env}:${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD in .env}@mongodb:27017/mesaj?authSource=admin"
+      MAMA_TLS_KEYSTORE_PATH: /run/secrets/mama-keystore.p12
+      MAMA_TLS_KEYSTORE_PASSWORD: ${MAMA_TLS_KEYSTORE_PASSWORD:?Set MAMA_TLS_KEYSTORE_PASSWORD in .env}
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       KAFKA_MESSAGES_TOPIC: ${KAFKA_MESSAGES_TOPIC:-mesaj.messages}
     depends_on:
@@ -89,6 +91,8 @@ services:
         condition: service_completed_successfully
     ports:
       - "127.0.0.1:${MAMA_PORT:-9090}:${MAMA_PORT:-9090}"
+    volumes:
+      - "${MAMA_TLS_KEYSTORE_FILE:?Set MAMA_TLS_KEYSTORE_FILE in .env}:/run/secrets/mama-keystore.p12:ro"
     healthcheck:
       test: bash -c 'echo > /dev/tcp/127.0.0.1/$$MAMA_PORT'
       interval: 10s
